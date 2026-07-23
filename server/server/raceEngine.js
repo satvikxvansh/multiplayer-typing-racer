@@ -30,7 +30,26 @@ function startRace(io, roomId) {
   io.to(roomId).emit("race_start", {
     passage: room.passage,
     startTimestamp,
-  });
+  }); 
 }
 
-module.exports = { startCountdown, startRace };
+function checkRaceComplete(io, roomId) {
+  const room = getRoom(roomId);
+  if (!room) return;
+
+  const allFinished = room.racers.every((r) => r.finished || r.disconnected);
+  if (!allFinished) return;
+
+  room.status = "finished";
+
+  const results = [...room.racers].sort(
+    (a, b) => (a.finishTimeMs ?? Infinity) - (b.finishTimeMs ?? Infinity)
+  );
+
+  io.to(roomId).emit("race_finished", { results });
+
+  // TODO(you): persist results to DB / update leaderboard here —
+  // this is the one place it should happen, since it only fires once.
+}
+
+module.exports = { startCountdown, startRace, checkRaceComplete };

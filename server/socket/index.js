@@ -1,18 +1,12 @@
 const { nanoid } = require("nanoid");
 
-const { createRoom, getRoom, addRacerToRoom } = require("../server/rooms");
-const { startCountdown } = require("../server/raceEngine");
+const { rooms, createRoom, getRoom, addRacerToRoom } = require("../server/rooms");
+const { startCountdown, checkRaceComplete } = require("../server/raceEngine");
 const { calculateProgress, calculateWpm } = require("../server/validation");
 
 function initSocket(io) {
   io.on("connection", (socket) => {
-    console.log("A user connected:", socket.id);
-
-    socket.on("create_room", () => {
-      const roomId = nanoid(6); // e.g. "a1B2c3"
-      socket.join(roomId);
-      socket.emit("room_created", { roomId }); // send the code back so they can share it
-    });
+    // console.log("A user connected:", socket.id);
 
     socket.on("join_room", (roomId) => {
       const room = getRoom(roomId);
@@ -21,22 +15,59 @@ function initSocket(io) {
         return;
       }
 
-      socket.join(roomId);
+      // if(!room.racers.find(racer => racer.socketId === socket.id)){
+        socket.join(roomId);
+      // }
+
       addRacerToRoom(roomId, socket.id);
       console.log(`${socket.id} joined room ${roomId}`);
       io.to(roomId).emit("room_state", room);
     });
 
-    // socket.on("join_room", (roomId) => {
+    socket.on("player_ready", (roomId) => {
+      const room = getRoom(roomId);
+      if (!room) return;
 
-    //   socket.join(roomId);
-    //   console.log(`${socket.id} joined room ${roomId}`);
-    //   socket.to(roomId).emit("user_joined", { socketId: socket.id });
-    //   socket.emit("joined_room", { roomId });
-    // });
+      const joined = room.racers.length;
+      console.log("Racers joined ", joined);
 
-    socket.on("room_state", (state) => {
-      
+      // TODO(you): only call this once ALL racers are ready, not on the first one
+      if(joined === 2){
+        startCountdown(io, roomId);
+      }
+    });
+
+    socket.on("typing_progress", ({ roomId, typedText, timestamp }) => {
+      const room = getRoom(roomId);
+      if (!room) return;
+
+      const racer = room.racers.find((r) => r.socketId === socket.id);
+      if (!racer || racer.finished) return;
+
+      const { progressPercent, isFinished, correctChars } = calculateProgress(
+        typedText,
+        room.passage
+      );
+      racer.progressPercent = progressPercent;
+      racer.wpm = calculateWpm(correctChars, room.startTimestamp);
+
+      io.to(roomId).emit("opponent_progress", {
+        socketId: socket.id,
+        progressPercent,
+        wpm: racer.wpm,
+      });
+
+      if (isFinished) {
+        racer.finished = true;
+        racer.finishTimeMs = timestamp;
+        io.to(roomId).emit("player_finished", {
+          socketId: socket.id,
+          finishTimeMs: timestamp,
+          placement: room.racers.filter((r) => r.finished).length,
+        });
+
+        checkRaceComplete(io, roomId);
+      }
     });
 
     socket.on("message", (data) => {
@@ -44,8 +75,17 @@ function initSocket(io) {
     });
 
     socket.on("disconnect", () => {
-      console.log("User disconnected:", socket.id);
+      for (const [roomId, room] of rooms) {
+        const racer = room.racers.find((r) => r.socketId === socket.id);
+        if (racer && !racer.finished) {
+          racer.disconnected = true; // counts as "done, but didn't finish" for completion purposes
+          io.to(roomId).emit("room_state", room);
+          checkRaceComplete(io, roomId);
+        }
+      }
+      console.log(socket.id, "Disconnected")
     });
+
   });
 }
 

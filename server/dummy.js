@@ -4,6 +4,7 @@ const { calculateProgress, calculateWpm } = require("../server/validation");
 
 function initSocket(io) {
   io.on("connection", (socket) => {
+    
     socket.on("join_room", (roomId) => {
       const room = getRoom(roomId);
       if (!room) {
@@ -24,36 +25,7 @@ function initSocket(io) {
       startCountdown(io, roomId);
     });
 
-    socket.on("typing_progress", ({ roomId, typedText, timestamp }) => {
-      const room = getRoom(roomId);
-      if (!room) return;
-
-      const racer = room.racers.find((r) => r.socketId === socket.id);
-      if (!racer || racer.finished) return;
-
-      const { progressPercent, isFinished, correctChars } = calculateProgress(
-        typedText,
-        room.passage
-      );
-      racer.progressPercent = progressPercent;
-      racer.wpm = calculateWpm(correctChars, room.startTimestamp);
-
-      io.to(roomId).emit("opponent_progress", {
-        socketId: socket.id,
-        progressPercent,
-        wpm: racer.wpm,
-      });
-
-      if (isFinished) {
-        racer.finished = true;
-        racer.finishTimeMs = timestamp;
-        io.to(roomId).emit("player_finished", {
-          socketId: socket.id,
-          finishTimeMs: timestamp,
-          placement: room.racers.filter((r) => r.finished).length,
-        });
-      }
-    });
+    
 
     socket.on("disconnect", () => {
       // TODO(you): remove/mark racer as disconnected in their room

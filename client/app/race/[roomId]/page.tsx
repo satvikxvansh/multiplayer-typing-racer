@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { getSocket } from "@/lib/socket";
 import type { Racer, RaceState, RaceStatus } from "@/lib/types";
-import PaceLights from "@/components/race/PaceLights";
 import RacerTrack from "@/components/race/RacerTrack";
 import TypingPassage from "@/components/race/TypingPassage";
 import WaitingRoom from "@/components/race/WaitingRoom";
@@ -35,6 +34,8 @@ export default function RacePage() {
     setSelfId(socket.id ?? null);
 
     socket.emit("join_room", roomId);
+    
+    socket.emit("player_ready", roomId);
 
     // socket.on() receives data by listening to the server.
     socket.on("room_state", (state: RaceState) => {
