@@ -17,6 +17,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 /* -------------------------------------------------------------------------- */
 /*  Data                                                                       */
@@ -237,10 +239,10 @@ function TypingPanel(): ReactNode {
           {isCurrent && focused ? (
             <span
               aria-hidden
-              className="absolute -left-[1px] top-[2px] bottom-[2px] w-[2px] animate-[blink_1.05s_steps(1)_infinite] bg-[#F2C14E]"
+              className="absolute -left-px top-0.5 bottom-0.5 w-0.5 animate-[blink_1.05s_steps(1)_infinite] bg-[#F2C14E]"
             />
           ) : null}
-          {char === " " ? " " : char}
+          {char === " " ? " " : char}
         </span>
       );
     });
@@ -490,7 +492,7 @@ function AuthModal({
         <button
           type="button"
           onClick={onGuest}
-          className="w-full rounded-lg border border-[#2A2F35] py-2.5 text-sm text-[#B8BFC6] transition-colors hover:border-[#3A4048] hover:text-[#E7EAED]"
+          className="cursor-pointer w-full rounded-lg border border-[#2A2F35] py-2.5 text-sm text-[#B8BFC6] transition-colors hover:border-[#3A4048] hover:text-[#E7EAED]"
         >
           Play as guest
         </button>
@@ -534,14 +536,21 @@ function Field({
 export default function TypingRacerLanding(): ReactNode {
   const [authMode, setAuthMode] = useState<AuthMode>(null);
   const [guest, setGuest] = useState<boolean>(false);
+  const router = useRouter();
 
   const startGuest = useCallback(() => {
     setGuest(true);
     setAuthMode(null);
-    // Scroll to the playable test.
-    document
-      .getElementById("play")
-      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    const handleCreateRoom = async () => {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rooms`, {
+        method: "POST",
+      });
+      const { roomId } = await res.json();
+      router.push(`/race/${roomId}`);
+    }
+
+    handleCreateRoom();
   }, []);
 
   return (
@@ -628,7 +637,7 @@ export default function TypingRacerLanding(): ReactNode {
               <button
                 type="button"
                 onClick={startGuest}
-                className="rounded-xl border border-[#2A2F35] px-5 py-3 text-sm text-[#E7EAED] transition-colors hover:border-[#3A4048]"
+                className="rounded-xl border border-[#2A2F35] cursor-pointer px-5 py-3 text-sm text-[#E7EAED] transition-colors hover:border-[#3A4048]"
               >
                 Play as guest
               </button>
