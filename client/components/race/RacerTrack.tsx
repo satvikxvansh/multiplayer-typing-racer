@@ -2,6 +2,7 @@
 
 import type { Racer } from "@/lib/types";
 
+
 interface RacerTrackProps {
   racer: Racer;
   isSelf: boolean;
@@ -14,7 +15,7 @@ interface RacerTrackProps {
  */
 export default function RacerTrack({ racer, isSelf }: RacerTrackProps) {
   const clamped = Math.min(100, Math.max(0, racer.progressPercent));
-
+  
   return (
     <div className="flex items-center gap-3">
       <div className="w-24 shrink-0 truncate font-sans text-xs text-[#8A9099]">
@@ -25,7 +26,7 @@ export default function RacerTrack({ racer, isSelf }: RacerTrackProps) {
       <div className="relative h-2 flex-1 overflow-visible rounded-full border border-[#1E2329] bg-[#101316]">
         {/* filled portion of the track */}
         <div
-          className="h-full rounded-full bg-[#1E2329]"
+          className="h-full rounded-full bg-[#f2c14e89]"
           style={{ width: `${clamped}%` }}
         />
 
@@ -46,8 +47,9 @@ export default function RacerTrack({ racer, isSelf }: RacerTrackProps) {
         </div>
       </div>
 
-      <div className="w-16 shrink-0 text-right font-mono text-xs text-[#8A9099]">
-        {racer.finished ? "done" : `${Math.round(clamped)}%`}
+      <div className="w-16 shrink-0 font-mono text-xs text-[#8A9099]">
+        <div className={`w-16 ${!racer.finished && 'opacity-0'} text-right font-mono text-xs text-green-400`}>done</div>
+        <div className="w-16 text-right font-mono text-sm text-[#8A9099]">{`${Math.round(racer.wpm)} wpm`}</div>
       </div>
     </div>
   );

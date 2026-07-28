@@ -25,11 +25,11 @@ function startRace(io, roomId) {
 
   room.status = "racing";
   room.passage = pickRandomPassage();
-  const startTimestamp = Date.now();
+  room.startTimestamp = Date.now();
 
   io.to(roomId).emit("race_start", {
     passage: room.passage,
-    startTimestamp,
+    startTimestamp: room.startTimestamp,
   }); 
 }
 

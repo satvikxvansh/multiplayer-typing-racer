@@ -7,6 +7,7 @@ import type { Racer, RaceState, RaceStatus } from "@/lib/types";
 import RacerTrack from "@/components/race/RacerTrack";
 import TypingPassage from "@/components/race/TypingPassage";
 import WaitingRoom from "@/components/race/WaitingRoom";
+import { Clock, FileText, Gauge, Target } from "lucide-react";
 
 const MAX_RACERS = 2;
 
@@ -21,6 +22,12 @@ export default function RacePage() {
   const [typedText, setTypedText] = useState("");
   const [selfId, setSelfId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
+
+  const [bestWpm, setBestWpm] = useState(0);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+  const RACE_TIME_LIMIT_SECONDS = 60; // TODO(you): tune this, or pull from room config sent by server
+
 
   const self = useMemo(
     () => racers.find((r) => r.socketId === selfId) ?? null,
@@ -126,6 +133,57 @@ export default function RacePage() {
     // leaderboards) must be computed server-side from validated keystrokes.
   }, [typedText, startedAt]);
 
+  // tick timeLeft down every second while racing
+  useEffect(() => {
+    if (status !== "racing" || !startedAt) return;
+
+    const interval = setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+      const remaining = Math.max(RACE_TIME_LIMIT_SECONDS - elapsedSeconds, 0);
+      setTimeLeft(remaining);
+
+      // TODO(you): when this hits 0, you likely want to emit something to the
+      // server so it can force-finish the race — a client-side timer alone
+      // can't be trusted to end the race authoritatively (same rule as before:
+      // the server decides when the race is actually over).
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [status, startedAt]);
+
+  // track personal best wpm as selfWpm updates
+  useEffect(() => {
+    if (selfWpm > bestWpm) setBestWpm(selfWpm);
+  }, [selfWpm, bestWpm]);
+
+  const totalWords = useMemo(
+    () => (passage ? passage.trim().split(/\s+/).length : 0),
+    [passage]
+  );
+  const wordsTyped = useMemo(
+    () => (typedText ? typedText.trim().split(/\s+/).length : 0),
+    [typedText]
+  );
+
+  const accuracy = useMemo(() => {
+    if (typedText.length === 0) return 100;
+    let correct = 0;
+    for (let i = 0; i < typedText.length; i++) {
+      if (typedText[i] === passage[i]) correct++;
+    }
+    return Math.round((correct / typedText.length) * 100);
+    // TODO(you): for the number that actually matters (leaderboards, results
+    // screen), use the server's calculated accuracy — this is a local,
+    // display-only estimate for the live stats bar.
+  }, [typedText, passage]);
+
+  function formatTime(seconds: number | null) {
+    if (seconds === null) return "0:00";
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+
   return (
     <main className="min-h-screen bg-[#0A0B0D] px-6 py-10 text-white">
       <div className="mx-auto flex max-w-3xl flex-col gap-8">
@@ -158,10 +216,57 @@ export default function RacePage() {
               ))}
             </section>
 
-            <section className="flex items-center justify-between font-mono text-sm">
-              <span className="text-[#8A9099]">your speed</span>
-              <span className="text-[#F2C14E]">{selfWpm} wpm</span>
-            </section>
+            <div className="flex items-center justify-between rounded-lg border border-[#1E2329] bg-[#101316] px-6 py-4">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-[#8A9099]" />
+                <div className="flex flex-col">
+                  <span className="font-sans text-[10px] uppercase tracking-[0.15em] text-[#8A9099]">
+                    Time Left
+                  </span>
+                  <span className="font-mono text-sm text-[#F2C14E]">
+                    {formatTime(timeLeft)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="h-8 w-px bg-[#1E2329]" />
+
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[#8A9099]" />
+                <div className="flex flex-col">
+                  <span className="font-sans text-[10px] uppercase tracking-[0.15em] text-[#8A9099]">
+                    Words
+                  </span>
+                  <span className="font-mono text-sm text-white">
+                    {wordsTyped} / {totalWords}
+                  </span>
+                </div>
+              </div>
+
+              <div className="h-8 w-px bg-[#1E2329]" />
+
+              <div className="flex items-center gap-2">
+                <Gauge className="h-4 w-4 text-[#8A9099]" />
+                <div className="flex flex-col">
+                  <span className="font-sans text-[10px] uppercase tracking-[0.15em] text-[#8A9099]">
+                    Best WPM
+                  </span>
+                  <span className="font-mono text-sm text-white">{bestWpm}</span>
+                </div>
+              </div>
+
+              <div className="h-8 w-px bg-[#1E2329]" />
+
+              <div className="flex items-center gap-2">
+                <Target className="h-4 w-4 text-[#8A9099]" />
+                <div className="flex flex-col">
+                  <span className="font-sans text-[10px] uppercase tracking-[0.15em] text-[#8A9099]">
+                    Accuracy
+                  </span>
+                  <span className="font-mono text-sm text-white">{accuracy}%</span>
+                </div>
+              </div>
+            </div>
 
             <TypingPassage
               passage={passage}

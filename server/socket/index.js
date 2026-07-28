@@ -6,7 +6,6 @@ const { calculateProgress, calculateWpm } = require("../server/validation");
 
 function initSocket(io) {
   io.on("connection", (socket) => {
-    // console.log("A user connected:", socket.id);
 
     socket.on("join_room", (roomId) => {
       const room = getRoom(roomId);

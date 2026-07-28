@@ -17,7 +17,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 /* -------------------------------------------------------------------------- */
@@ -535,6 +534,7 @@ function Field({
 
 export default function TypingRacerLanding(): ReactNode {
   const [authMode, setAuthMode] = useState<AuthMode>(null);
+  const [joinRoomMode, setJoinRoomMode] = useState<AuthMode>(null);
   const [guest, setGuest] = useState<boolean>(false);
   const router = useRouter();
 
@@ -629,17 +629,17 @@ export default function TypingRacerLanding(): ReactNode {
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={() => setAuthMode("signup")}
+                onClick={startGuest}
                 className="rounded-xl bg-[#F2C14E] px-5 py-3 text-sm font-semibold text-[#0A0B0D] transition-transform hover:brightness-110 active:scale-[0.98]"
               >
-                Create account
+                Play as guest
               </button>
               <button
                 type="button"
-                onClick={startGuest}
+                onClick={() => setAuthMode("signup")}
                 className="rounded-xl border border-[#2A2F35] cursor-pointer px-5 py-3 text-sm text-[#E7EAED] transition-colors hover:border-[#3A4048]"
               >
-                Play as guest
+                Join Room
               </button>
               <a
                 href="#play"

@@ -27,6 +27,7 @@ function addRacerToRoom(roomId, socketId) {
     name: `Racer ${room.racers.length + 1}`,
     progressPercent: 0,
     wpm: 0,
+    startTimestamp: null,
     finished: false,
     finishTimeMs: null,
   });
