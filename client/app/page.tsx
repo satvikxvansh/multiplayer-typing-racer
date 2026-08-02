@@ -17,6 +17,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation';
 
 /* -------------------------------------------------------------------------- */
@@ -587,20 +588,27 @@ export default function TypingRacerLanding(): ReactNode {
               guest mode
             </span>
           ) : null}
-          <button
-            type="button"
-            onClick={() => setAuthMode("signin")}
-            className="rounded-lg px-3 py-2 text-sm text-[#B8BFC6] transition-colors hover:text-[#E7EAED]"
-          >
-            Sign in
-          </button>
-          <button
-            type="button"
-            onClick={() => setAuthMode("signup")}
-            className="rounded-lg bg-[#F2C14E] px-3.5 py-2 text-sm font-semibold text-[#0A0B0D] transition-transform hover:brightness-110 active:scale-[0.98]"
-          >
-            Create account
-          </button>
+          <Show when="signed-out">
+            <SignInButton>
+              <button
+                type="button"
+                className="cursor-pointer rounded-lg px-3 py-2 text-sm text-[#B8BFC6] transition-colors hover:text-[#E7EAED]"
+              >
+                Sign in
+              </button>
+            </SignInButton>
+            <SignUpButton>
+              <button
+                type="button"
+                className="cursor-pointer rounded-lg bg-[#F2C14E] px-3.5 py-2 text-sm font-semibold text-[#0A0B0D] transition-transform hover:brightness-110 active:scale-[0.98]"
+              >
+                Create account
+              </button>
+            </SignUpButton>
+          </Show>
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
         </nav>
       </header>
 
