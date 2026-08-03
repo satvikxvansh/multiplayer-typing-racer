@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useEffect } from "react";
 
 interface TypingPassageProps {
   passage: string;
@@ -23,6 +23,12 @@ export default function TypingPassage({
 }: TypingPassageProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (!disabled) {
+      inputRef.current?.focus();
+    }
+  }, [disabled]);
+
   const characters = useMemo(() => {
     return passage.split("").map((char, i) => {
       let state: "correct" | "incorrect" | "pending" = "pending";
@@ -36,7 +42,7 @@ export default function TypingPassage({
   return (
     <div
       className="relative cursor-text rounded-lg border border-[#1E2329] bg-[#101316] p-6"
-      onClick={() => inputRef.current?.focus()}
+      // onClick={() => inputRef.current?.focus()}
     >
       <p className="select-none whitespace-pre-wrap break-words font-mono text-lg leading-relaxed tracking-wide">
         {characters.map(({ char, state, isCaret }, i) => (
@@ -70,12 +76,10 @@ export default function TypingPassage({
         value={typedText}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        onPaste={(e) => {
-          e.preventDefault();
-          // TODO(you): decide whether pasting should be blocked server-side
-          // too — a determined cheater can still bypass a client-side
-          // preventDefault, so don't rely on this alone.
+        onBlur={() => {
+          if (!disabled) inputRef.current?.focus(); // snap focus back mid-race
         }}
+        onPaste={(e) => e.preventDefault()}
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"

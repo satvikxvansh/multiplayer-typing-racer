@@ -1,12 +1,15 @@
 function calculateProgress(typedText, passage) {
   let correctChars = 0;
+  let totalChars = 0;
+
   for (let i = 0; i < typedText.length; i++) {
     if (typedText[i] === passage[i]) correctChars++;
-    else break; // stop at first mistake, or allow skip-ahead — your call
+    totalChars++;
+    // else break; // stop at first mistake, or allow skip-ahead — your call
   }
 
-  const progressPercent = (correctChars / passage.length) * 100;
-  const isFinished = correctChars === passage.length;
+  const progressPercent = (totalChars / passage.length) * 100;
+  const isFinished = totalChars === passage.length;
 
   return { progressPercent, isFinished, correctChars };
 }
