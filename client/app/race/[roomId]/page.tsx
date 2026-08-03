@@ -295,7 +295,7 @@ export default function RacePage() {
                         r.socketId === selfId ? "text-[#F2C14E]" : "text-white"
                       }
                     >
-                      {i + 1}. {r.name}
+                      Rank {i + 1}. {r.name}
                     </span>
                     <span className="text-[#8A9099]">{r.wpm} wpm</span>
                   </li>

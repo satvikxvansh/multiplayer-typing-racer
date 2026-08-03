@@ -18,7 +18,7 @@ import {
   type ReactNode,
 } from "react";
 import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs'
-import { useRouter } from 'next/navigation';
+import { redirect, useRouter } from 'next/navigation';
 
 /* -------------------------------------------------------------------------- */
 /*  Data                                                                       */
@@ -33,8 +33,7 @@ const SAMPLE_TEXTS: readonly string[] = [
 ];
 
 type TestStatus = "idle" | "running" | "finished";
-type AuthTab = "signin" | "signup";
-type AuthMode = AuthTab | null;
+type JoinRoomMode = "OPEN" | null;
 
 /* -------------------------------------------------------------------------- */
 /*  Small helpers                                                              */
@@ -365,19 +364,11 @@ function TypingPanel(): ReactNode {
 /*  Auth modal                                                                 */
 /* -------------------------------------------------------------------------- */
 
-function AuthModal({
-  mode,
-  onClose,
-  onSwitch,
-  onGuest,
-}: {
-  mode: AuthMode;
-  onClose: () => void;
-  onSwitch: (tab: AuthTab) => void;
-  onGuest: () => void;
-}): ReactNode {
+function JoinRoomModal({ mode, onClose }: { mode: JoinRoomMode; onClose: () => void; }): ReactNode {
   const open = mode !== null;
   const dialogRef = useRef<HTMLDivElement>(null);
+  const [roomId, setRoomId] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
     if (!open) return;
@@ -393,14 +384,21 @@ function AuthModal({
   }, [open, onClose]);
 
   if (!open) return null;
-  const isSignup = mode === "signup";
+
+  function handleJoinRoom(e: React.FormEvent) {
+    e.preventDefault();
+    if (!roomId.trim()) return; // TODO(you): show a validation message instead of silently ignoring
+
+    router.push(`/race/${roomId.trim()}`);
+    onClose();
+  }
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-label={isSignup ? "Create account" : "Sign in"}
+      aria-label="Join Room"
     >
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -434,68 +432,20 @@ function AuthModal({
           </button>
         </div>
 
-        {/* Tab switch */}
-        <div className="mb-6 grid grid-cols-2 rounded-lg border border-[#1E2329] bg-[#0A0B0D] p-1">
-          {(["signup", "signin"] as const).map((tab) => {
-            const active = mode === tab;
-            return (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => onSwitch(tab)}
-                className={classNames(
-                  "rounded-md py-2 text-xs font-medium transition-colors",
-                  active
-                    ? "bg-[#1A1E23] text-[#E7EAED]"
-                    : "text-[#79828B] hover:text-[#B8BFC6]"
-                )}
-              >
-                {tab === "signup" ? "Create account" : "Sign in"}
-              </button>
-            );
-          })}
-        </div>
-
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            // Wire this to your auth backend.
-            onClose();
-          }}
+          onSubmit={handleJoinRoom}
           className="space-y-4"
         >
-          {isSignup ? (
-            <Field label="Username" name="username" type="text" placeholder="racer_01" />
-          ) : null}
-          <Field label="Email" name="email" type="email" placeholder="you@example.com" />
-          <Field
-            label="Password"
-            name="password"
-            type="password"
-            placeholder="••••••••"
-          />
+          
+          <Field label="Room Id" name="Room Id" type="text" placeholder="AS81N3" value={roomId} onChange={(e) => setRoomId(e.target.value)} />
 
           <button
             type="submit"
             className="mt-2 w-full rounded-lg bg-[#F2C14E] py-2.5 text-sm font-semibold text-[#0A0B0D] transition-transform hover:brightness-110 active:scale-[0.99]"
           >
-            {isSignup ? "Create account" : "Sign in"}
+            Join Now
           </button>
         </form>
-
-        <div className="my-5 flex items-center gap-3 text-[11px] uppercase tracking-[0.16em] text-[#4B535B]">
-          <span className="h-px flex-1 bg-[#1E2329]" />
-          or
-          <span className="h-px flex-1 bg-[#1E2329]" />
-        </div>
-
-        <button
-          type="button"
-          onClick={onGuest}
-          className="cursor-pointer w-full rounded-lg border border-[#2A2F35] py-2.5 text-sm text-[#B8BFC6] transition-colors hover:border-[#3A4048] hover:text-[#E7EAED]"
-        >
-          Play as guest
-        </button>
       </div>
     </div>
   );
@@ -506,11 +456,15 @@ function Field({
   name,
   type,
   placeholder,
+  value,
+  onChange
 }: {
   label: string;
   name: string;
   type: string;
   placeholder: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }): ReactNode {
   return (
     <label className="block">
@@ -518,10 +472,13 @@ function Field({
         {label}
       </span>
       <input
+        id={name}
         name={name}
         type={type}
+        value={value}
         required
         placeholder={placeholder}
+        onChange={onChange}
         autoComplete="off"
         className="w-full rounded-lg border border-[#22262B] bg-[#0A0B0D] px-3 py-2.5 text-sm text-[#E7EAED] placeholder:text-[#3A4048] outline-none transition-colors focus:border-[#F2C14E]/60 focus:ring-1 focus:ring-[#F2C14E]/30"
       />
@@ -534,14 +491,12 @@ function Field({
 /* -------------------------------------------------------------------------- */
 
 export default function TypingRacerLanding(): ReactNode {
-  const [authMode, setAuthMode] = useState<AuthMode>(null);
-  const [joinRoomMode, setJoinRoomMode] = useState<AuthMode>(null);
+  const [joinRoomMode, setJoinRoomMode] = useState<JoinRoomMode>(null);
   const [guest, setGuest] = useState<boolean>(false);
   const router = useRouter();
 
   const startGuest = useCallback(() => {
     setGuest(true);
-    setAuthMode(null);
 
     const handleCreateRoom = async () => {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rooms`, {
@@ -638,13 +593,13 @@ export default function TypingRacerLanding(): ReactNode {
               <button
                 type="button"
                 onClick={startGuest}
-                className="rounded-xl bg-[#F2C14E] px-5 py-3 text-sm font-semibold text-[#0A0B0D] transition-transform hover:brightness-110 active:scale-[0.98]"
+                className="rounded-xl bg-[#F2C14E] px-5 py-3 text-sm font-semibold text-[#0A0B0D] transition-transform hover:brightness-110 active:scale-[0.98] cursor-pointer"
               >
                 Play as guest
               </button>
               <button
                 type="button"
-                onClick={() => setAuthMode("signup")}
+                onClick={() => setJoinRoomMode("OPEN")}
                 className="rounded-xl border border-[#2A2F35] cursor-pointer px-5 py-3 text-sm text-[#E7EAED] transition-colors hover:border-[#3A4048]"
               >
                 Join Room
@@ -713,7 +668,7 @@ export default function TypingRacerLanding(): ReactNode {
             body="Save your stats, climb the leaderboard, and challenge friends to head-to-head races."
             action="Create account"
             highlight
-            onClick={() => setAuthMode("signup")}
+            // onClick={() => setAuthMode("signup")}
           />
         </div>
       </section>
@@ -727,13 +682,8 @@ export default function TypingRacerLanding(): ReactNode {
         <span>Built for people who like the sound of a keyboard.</span>
       </footer>
 
-      {/* Auth modal */}
-      <AuthModal
-        mode={authMode}
-        onClose={() => setAuthMode(null)}
-        onSwitch={(tab) => setAuthMode(tab)}
-        onGuest={startGuest}
-      />
+      {/* Join Room Modal */}
+      <JoinRoomModal mode={joinRoomMode} onClose={() => setJoinRoomMode(null)}/>
     </main>
   );
 }
