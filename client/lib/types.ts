@@ -51,4 +51,5 @@ export interface ServerToClientEvents {
   }) => void;
   race_finished: (payload: { results: Racer[] }) => void;
   error_message: (message: string) => void;
+  race_feedback: (payload: { feedback: string }) => void;
 }

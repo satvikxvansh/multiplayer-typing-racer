@@ -18,4 +18,17 @@ function calculateWpm(correctChars, startTimestamp) {
   return Math.round(words / elapsedMinutes);
 }
 
-module.exports = { calculateProgress, calculateWpm };
+function getMistypedWords(typedText, passage) {
+  const typedWords = typedText.trim().split(/\s+/);
+  const passageWords = passage.trim().split(/\s+/);
+
+  const mistyped = [];
+  for (let i = 0; i < typedWords.length; i++) {
+    if (typedWords[i] !== passageWords[i]) {
+      mistyped.push(passageWords[i]);
+    }
+  }
+  return [...new Set(mistyped)].slice(0, 5); // unique, capped so the prompt stays small
+}
+
+module.exports = { calculateProgress, calculateWpm, getMistypedWords };

@@ -26,6 +26,8 @@ export default function RacePage() {
   const [bestWpm, setBestWpm] = useState(0);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
+  const [feedback, setFeedback] = useState<string | null>(null);
+
   const RACE_TIME_LIMIT_SECONDS = 60; // TODO(you): tune this, or pull from room config sent by server
 
 
@@ -85,6 +87,10 @@ export default function RacePage() {
       setRacers(results);
     });
 
+    socket.on("race_feedback", ({ feedback }) => {
+      setFeedback(feedback);
+    });
+
     socket.on("error_message", (message) => {
       // TODO(you): surface this in a toast/banner instead of console.
       console.error("Race error:", message);
@@ -101,6 +107,7 @@ export default function RacePage() {
       socket.off("player_finished");
       socket.off("race_finished");
       socket.off("error_message");
+      socket.off("race_feedback");
       socket.disconnect();
     };
   }, [roomId]);
@@ -301,6 +308,18 @@ export default function RacePage() {
                   </li>
                 ))}
             </ol>
+            {feedback ? (
+              <div className="mt-4 rounded-md border border-[#1E2329] bg-[#0A0B0D] p-4">
+                <p className="mb-1 font-sans text-[10px] uppercase tracking-[0.15em] text-[#F2C14E]">
+                  Coach&apos;s Note
+                </p>
+                <p className="font-sans text-sm text-[#8A9099]">{feedback}</p>
+              </div>
+            ) : (
+              <p className="mt-4 font-sans text-xs text-[#8A9099] animate-pulse">
+                Generating feedback...
+              </p>
+            )}
             {/*
               TODO(you):
               - "Play again" button that re-joins/re-creates a room.

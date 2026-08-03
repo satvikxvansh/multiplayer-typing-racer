@@ -668,7 +668,7 @@ export default function TypingRacerLanding(): ReactNode {
             body="Save your stats, climb the leaderboard, and challenge friends to head-to-head races."
             action="Create account"
             highlight
-            // onClick={() => setAuthMode("signup")}
+            onClick={() => <SignUpButton/>}
           />
         </div>
       </section>

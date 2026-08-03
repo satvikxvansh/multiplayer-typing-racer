@@ -2,7 +2,7 @@ const { nanoid } = require("nanoid");
 
 const { rooms, createRoom, getRoom, addRacerToRoom } = require("../server/rooms");
 const { startCountdown, checkRaceComplete } = require("../server/raceEngine");
-const { calculateProgress, calculateWpm } = require("../server/validation");
+const { calculateProgress, calculateWpm, getMistypedWords  } = require("../server/validation");
 
 function initSocket(io) {
   io.on("connection", (socket) => {
@@ -65,6 +65,20 @@ function initSocket(io) {
           placement: room.racers.filter((r) => r.finished).length,
         });
 
+        checkRaceComplete(io, roomId);
+      }
+
+      if (isFinished) {
+        racer.finished = true;
+        racer.finishTimeMs = timestamp;
+        racer.mistypedWords = getMistypedWords(typedText, room.passage);
+
+        io.to(roomId).emit("player_finished", {
+          socketId: socket.id,
+          finishTimeMs: timestamp,
+          placement: room.racers.filter((r) => r.finished).length,
+        });
+      
         checkRaceComplete(io, roomId);
       }
     });

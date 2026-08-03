@@ -1,5 +1,6 @@
 const { getRoom } = require("./rooms");
 const { PASSAGES, pickRandomPassage } = require("./passages");
+const { generateFeedback } = require("./feedback");
 
 function startCountdown(io, roomId) {
   const room = getRoom(roomId);
@@ -48,8 +49,21 @@ function checkRaceComplete(io, roomId) {
 
   io.to(roomId).emit("race_finished", { results });
 
+  for (const racer of room.racers) {
+    if (!racer.finished) continue; // skip disconnects — nothing to give feedback on
+
+    generateFeedback({
+      wpm: racer.wpm,
+      accuracy: racer.accuracy ?? 100, // TODO(you): wire in your real accuracy calc if tracked server-side
+      mistypedWords: racer.mistypedWords ?? [],
+    }).then((feedback) => {
+      io.to(racer.socketId).emit("race_feedback", { feedback });
+    });
+  }
+
   // TODO(you): persist results to DB / update leaderboard here —
   // this is the one place it should happen, since it only fires once.
 }
+
 
 module.exports = { startCountdown, startRace, checkRaceComplete };
