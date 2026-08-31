@@ -36,52 +36,46 @@ function initSocket(io) {
       }
     });
 
-    socket.on("typing_progress", ({ roomId, typedText, timestamp }) => {
-      const room = getRoom(roomId);
-      if (!room) return;
-
-      const racer = room.racers.find((r) => r.socketId === socket.id);
-      if (!racer || racer.finished) return;
-
-      const { progressPercent, isFinished, correctChars } = calculateProgress(
-        typedText,
-        room.passage
-      );
-      racer.progressPercent = progressPercent;
-      racer.wpm = calculateWpm(correctChars, room.startTimestamp);
-
-      io.to(roomId).emit("opponent_progress", {
-        socketId: socket.id,
-        progressPercent,
-        wpm: racer.wpm,
-      });
-
-      if (isFinished) {
-        racer.finished = true;
-        racer.finishTimeMs = timestamp;
-        io.to(roomId).emit("player_finished", {
-          socketId: socket.id,
-          finishTimeMs: timestamp,
-          placement: room.racers.filter((r) => r.finished).length,
-        });
-
-        checkRaceComplete(io, roomId);
-      }
-
-      if (isFinished) {
-        racer.finished = true;
-        racer.finishTimeMs = timestamp;
-        racer.mistypedWords = getMistypedWords(typedText, room.passage);
-
-        io.to(roomId).emit("player_finished", {
-          socketId: socket.id,
-          finishTimeMs: timestamp,
-          placement: room.racers.filter((r) => r.finished).length,
-        });
-      
-        checkRaceComplete(io, roomId);
-      }
+  socket.on("typing_progress", ({ roomId, typedText, timestamp }) => {
+    const room = getRoom(roomId);
+    if (!room) return;
+  
+    const racer = room.racers.find((r) => r.socketId === socket.id);
+    if (!racer || racer.finished) return;
+  
+    if (typedText.length < (racer.lastTypedLength ?? 0)) {
+      racer.backspaces = (racer.backspaces ?? 0) + 1;
+    }
+    racer.lastTypedLength = typedText.length;
+  
+    const { progressPercent, isFinished, correctChars, incorrectChars } =
+      calculateProgress(typedText, room.passage);
+  
+    racer.progressPercent = progressPercent;
+    racer.correctChars = correctChars;
+    racer.incorrectChars = incorrectChars;
+    racer.wpm = calculateWpm(correctChars, room.startTimestamp);
+  
+    io.to(roomId).emit("opponent_progress", {
+      socketId: socket.id,
+      progressPercent,
+      wpm: racer.wpm,
     });
+  
+    if (isFinished) {
+      racer.finished = true;
+      racer.finishTimeMs = timestamp;
+      racer.mistypedWords = getMistypedWords(typedText, room.passage);
+    
+      io.to(roomId).emit("player_finished", {
+        socketId: socket.id,
+        finishTimeMs: timestamp,
+        placement: room.racers.filter((r) => r.finished).length,
+      });
+    
+      checkRaceComplete(io, roomId);
+    }
+  });
 
     socket.on("message", (data) => {
       io.emit("message", data);
