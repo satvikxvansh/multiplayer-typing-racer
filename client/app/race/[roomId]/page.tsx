@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { getSocket } from "@/lib/socket";
-import type { Racer, RaceState, RaceStatus } from "@/lib/types";
+import type { Racer, RaceState, RaceStatus, RaceStats } from "@/lib/types";
 import RacerTrack from "@/components/race/RacerTrack";
 import TypingPassage from "@/components/race/TypingPassage";
 import WaitingRoom from "@/components/race/WaitingRoom";
 import { Clock, FileText, Gauge, Target } from "lucide-react";
+
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const MAX_RACERS = 2;
 
@@ -28,6 +30,8 @@ export default function RacePage() {
 
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  const [raceStats, setRaceStats] = useState<RaceStats | null>(null);
+
   const RACE_TIME_LIMIT_SECONDS = 60; // TODO(you): tune this, or pull from room config sent by server
 
 
@@ -43,7 +47,7 @@ export default function RacePage() {
     setSelfId(socket.id ?? null);
 
     socket.emit("join_room", roomId);
-    
+
     socket.emit("player_ready", roomId);
 
     // socket.on() receives data by listening to the server.
@@ -97,6 +101,10 @@ export default function RacePage() {
       alert("Race error, check console");
     });
 
+    socket.on("race_stats", (stats) => {
+      setRaceStats(stats);
+    });
+
     // returns cleanup functions, to avoid memory leaks, etc.
     return () => {
       socket.emit("leave_room", roomId);
@@ -108,6 +116,7 @@ export default function RacePage() {
       socket.off("race_finished");
       socket.off("error_message");
       socket.off("race_feedback");
+      socket.off("race_stats");
       socket.disconnect();
     };
   }, [roomId]);
@@ -319,6 +328,37 @@ export default function RacePage() {
               <p className="mt-4 font-sans text-xs text-[#8A9099] animate-pulse">
                 Generating feedback...
               </p>
+            )}
+            {raceStats && (
+              <section className="rounded-lg border border-[#1E2329] bg-[#101316] p-6">
+                <h2 className="mb-4 font-sans text-xs uppercase tracking-[0.2em] text-[#8A9099]">
+                  Your Race Breakdown
+                </h2>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={raceStats.timeline}>
+                    <CartesianGrid stroke="#1E2329" strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="second"
+                      tick={{ fill: "#8A9099", fontSize: 11 }}
+                      label={{ value: "seconds", position: "insideBottom", offset: -5, fill: "#8A9099", fontSize: 11 }}
+                    />
+                    <YAxis tick={{ fill: "#8A9099", fontSize: 11 }} />
+                    <Tooltip
+                      contentStyle={{ background: "#0A0B0D", border: "1px solid #1E2329", fontSize: 12 }}
+                      labelStyle={{ color: "#8A9099" }}
+                    />
+                    <Line type="monotone" dataKey="wpm" stroke="#F2C14E" strokeWidth={2} dot={false} name="WPM" />
+                    <Line type="monotone" dataKey="accuracy" stroke="#8A9099" strokeWidth={1.5} dot={false} name="Accuracy %" />
+                  </LineChart>
+                </ResponsiveContainer>
+
+                <div className="mt-4 grid grid-cols-4 gap-4 font-mono text-xs text-[#8A9099]">
+                  <div>Backspaces: <span className="text-white">{raceStats.backspaces}</span></div>
+                  <div>Correct: <span className="text-white">{raceStats.correctChars}</span></div>
+                  <div>Errors: <span className="text-white">{raceStats.incorrectChars}</span></div>
+                  <div>Duration: <span className="text-white">{raceStats.duration}s</span></div>
+                </div>
+              </section>
             )}
             {/*
               TODO(you):

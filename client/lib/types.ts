@@ -52,4 +52,23 @@ export interface ServerToClientEvents {
   race_finished: (payload: { results: Racer[] }) => void;
   error_message: (message: string) => void;
   race_feedback: (payload: { feedback: string }) => void;
+  race_stats: (stats: RaceStats) => void;
+}
+
+export interface TimelinePoint {
+  second: number;
+  wpm: number;
+  accuracy: number;
+  progressPercent: number;
+}
+
+export interface RaceStats {
+  wpm: number;
+  accuracy: number;
+  duration: number | null;
+  correctChars: number;
+  incorrectChars: number;
+  backspaces: number;
+  mistypedWords: string[];
+  timeline: TimelinePoint[];
 }

@@ -1,6 +1,8 @@
-const { getRoom } = require("./rooms");
-const { PASSAGES, pickRandomPassage } = require("./passages");
+const { getRoom, deleteRoom, ROOM_CLEANUP_DELAY_MS } = require("./rooms");
+const { pickRandomPassage } = require("./passages");
 const { generateFeedback } = require("./feedback");
+
+const RACE_TIME_LIMIT_MS = 120 * 1000; // 2-minute backstop timeout for stalled races
 
 function buildRaceStats(racer, room) {
   const duration = racer.finishTimeMs
@@ -24,25 +26,64 @@ function buildRaceStats(racer, room) {
 
 function startCountdown(io, roomId) {
   const room = getRoom(roomId);
-  if (!room) return;
+  if (!room || room.status === "countdown" || room.status === "racing") return;
+
+  if (room.countdownInterval) {
+    clearInterval(room.countdownInterval);
+    room.countdownInterval = null;
+  }
 
   room.status = "countdown";
   let value = 3;
+  room.countdownValue = value;
 
-  const interval = setInterval(() => {
+  room.countdownInterval = setInterval(() => {
+    const currentRoom = getRoom(roomId);
+    if (!currentRoom || currentRoom.status !== "countdown") {
+      if (room.countdownInterval) {
+        clearInterval(room.countdownInterval);
+        room.countdownInterval = null;
+      }
+      return;
+    }
+
+    currentRoom.countdownValue = value;
     io.to(roomId).emit("countdown_tick", value);
     value--;
 
     if (value < 0) {
-      clearInterval(interval);
+      clearInterval(currentRoom.countdownInterval);
+      currentRoom.countdownInterval = null;
+      currentRoom.countdownValue = null;
       startRace(io, roomId);
     }
   }, 1000);
 }
 
+function cancelCountdown(io, roomId) {
+  const room = getRoom(roomId);
+  if (!room || room.status !== "countdown") return;
+
+  if (room.countdownInterval) {
+    clearInterval(room.countdownInterval);
+    room.countdownInterval = null;
+  }
+  room.status = "waiting";
+  room.countdownValue = null;
+}
+
 function startRace(io, roomId) {
   const room = getRoom(roomId);
   if (!room) return;
+
+  if (room.countdownInterval) {
+    clearInterval(room.countdownInterval);
+    room.countdownInterval = null;
+  }
+  if (room.sampleInterval) {
+    clearInterval(room.sampleInterval);
+    room.sampleInterval = null;
+  }
 
   room.status = "racing";
   room.passage = pickRandomPassage();
@@ -65,9 +106,20 @@ function startRace(io, roomId) {
 
   // snapshot every racer's state once a second while racing
   room.sampleInterval = setInterval(() => {
-    const elapsedSeconds = Math.round((Date.now() - room.startTimestamp) / 1000);
+    // const elapsedSeconds = Math.round((Date.now() - room.startTimestamp) / 1000);
+    const currentRoom = getRoom(roomId);
+    if (!currentRoom || currentRoom.status !== "racing") {
+      if (room.sampleInterval) {
+        clearInterval(room.sampleInterval);
+        room.sampleInterval = null;
+      }
+      return;
+    }
 
-    room.racers.forEach((r) => {
+    // room.racers.forEach((r) => {
+    const elapsedSeconds = Math.round((Date.now() - currentRoom.startTimestamp) / 1000);
+
+    currentRoom.racers.forEach((r) => {
       const totalTyped = r.correctChars + r.incorrectChars;
       const accuracy = totalTyped > 0 ? Math.round((r.correctChars / totalTyped) * 100) : 100;
 
@@ -80,17 +132,46 @@ function startRace(io, roomId) {
     });
   }, 1000);
 
-  // TODO(you): tie this to your RACE_TIME_LIMIT_SECONDS backstop timeout too
+  // Authoritative backstop timeout to force finish the race if stalled
+  if (room.raceTimeout) {
+    clearTimeout(room.raceTimeout);
+  }
+  room.raceTimeout = setTimeout(() => {
+    forceFinishRace(io, roomId);
+  }, RACE_TIME_LIMIT_MS);
+}
+
+function forceFinishRace(io, roomId) {
+  const room = getRoom(roomId);
+  if (!room || room.status !== "racing") return;
+
+  console.log(`Race in room ${roomId} timed out after limit. Force finishing.`);
+  room.racers.forEach((racer) => {
+    if (!racer.finished && !racer.disconnected) {
+      racer.finished = true;
+      racer.finishTimeMs = Date.now();
+    }
+  });
+
+  checkRaceComplete(io, roomId);
 }
 
 async function checkRaceComplete(io, roomId) {
   const room = getRoom(roomId);
-  if (!room) return;
+  if (!room || room.status === "finished") return;
 
-  const allFinished = room.racers.every((r) => r.finished || r.disconnected);
+  const allFinished = room.racers.length > 0 && room.racers.every((r) => r.finished || r.disconnected);
   if (!allFinished) return;
 
-  clearInterval(room.sampleInterval); // stop sampling — race is over
+  // Stop sampling interval and race timeout
+  if (room.sampleInterval) {
+    clearInterval(room.sampleInterval);
+    room.sampleInterval = null;
+  }
+  if (room.raceTimeout) {
+    clearTimeout(room.raceTimeout);
+    room.raceTimeout = null;
+  }
 
   room.status = "finished";
 
@@ -114,9 +195,27 @@ async function checkRaceComplete(io, roomId) {
     });
   }
 
-  // TODO(you): persist results to DB / update leaderboard here —
-  // this is the one place it should happen, since it only fires once.
+  // If all racers have already disconnected, clean up immediately
+  const hasConnectedRacers = room.racers.some((r) => !r.disconnected);
+  if (!hasConnectedRacers) {
+    deleteRoom(roomId);
+    return;
+  }
+
+  // Otherwise, schedule post-race room cleanup so finished rooms don't linger forever
+  if (room.cleanupTimeout) {
+    clearTimeout(room.cleanupTimeout);
+  }
+  room.cleanupTimeout = setTimeout(() => {
+    deleteRoom(roomId);
+  }, ROOM_CLEANUP_DELAY_MS);
 }
 
-
-module.exports = { startCountdown, startRace, checkRaceComplete };
+module.exports = {
+  startCountdown,
+  cancelCountdown,
+  startRace,
+  forceFinishRace,
+  checkRaceComplete,
+  RACE_TIME_LIMIT_MS,
+};
