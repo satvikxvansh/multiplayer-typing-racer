@@ -1,4 +1,4 @@
-const { rooms, getRoom, deleteRoom, addRacerToRoom } = require("../server/rooms");
+const { rooms, getRoom, deleteRoom, addRacerToRoom, EMPTY_ROOM_TIMEOUT_MS } = require("../server/rooms");
 const { startCountdown, cancelCountdown, checkRaceComplete } = require("../server/raceEngine");
 const { calculateProgress, calculateWpm, getMistypedWords } = require("../server/validation");
 
@@ -15,9 +15,13 @@ function handleRacerLeave(io, socket, roomId) {
     // Remove racer from waiting room list
     room.racers = room.racers.filter((r) => r.socketId !== socket.id);
 
-    // If no racers left in waiting room, delete room immediately!
+    // If no racers left in waiting room, schedule empty room cleanup rather than deleting immediately
     if (room.racers.length === 0) {
-      deleteRoom(roomId);
+      if (!room.emptyTimeout) {
+        room.emptyTimeout = setTimeout(() => {
+          deleteRoom(roomId);
+        }, EMPTY_ROOM_TIMEOUT_MS);
+      }
       return;
     }
 

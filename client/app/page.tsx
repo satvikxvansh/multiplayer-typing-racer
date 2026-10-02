@@ -387,9 +387,11 @@ function JoinRoomModal({ mode, onClose }: { mode: JoinRoomMode; onClose: () => v
 
   function handleJoinRoom(e: React.FormEvent) {
     e.preventDefault();
-    if (!roomId.trim()) return; // TODO(you): show a validation message instead of silently ignoring
+    const raw = roomId.trim();
+    if (!raw) return;
 
-    router.push(`/race/${roomId.trim()}`);
+    const cleanId = raw.split("/").filter(Boolean).pop() || raw;
+    router.push(`/race/${cleanId}`);
     onClose();
   }
 
@@ -499,15 +501,24 @@ export default function TypingRacerLanding(): ReactNode {
     setGuest(true);
 
     const handleCreateRoom = async () => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rooms`, {
-        method: "POST",
-      });
-      const { roomId } = await res.json();
-      router.push(`/race/${roomId}`);
-    }
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+        const res = await fetch(`${apiUrl}/api/rooms`, {
+          method: "POST",
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to create room: ${res.statusText}`);
+        }
+        const { roomId } = await res.json();
+        router.push(`/race/${roomId}`);
+      } catch (err) {
+        console.error("Error creating room:", err);
+        alert("Failed to create race room. Please make sure the server is running.");
+      }
+    };
 
     handleCreateRoom();
-  }, []);
+  }, [router]);
 
   return (
     <main className="min-h-screen bg-[#0A0B0D] text-[#E7EAED] antialiased [font-family:ui-sans-serif,system-ui,-apple-system,'Segoe_UI',sans-serif]">
@@ -617,7 +628,7 @@ export default function TypingRacerLanding(): ReactNode {
                 <dt className="text-[11px] uppercase tracking-[0.18em] text-[#79828B]">
                   Live races
                 </dt>
-                <dd className="mt-1 font-mono text-lg text-[#E7EAED]">1v1 – 8</dd>
+                <dd className="mt-1 font-mono text-lg text-[#E7EAED]">1v1 - 5</dd>
               </div>
               <div>
                 <dt className="text-[11px] uppercase tracking-[0.18em] text-[#79828B]">

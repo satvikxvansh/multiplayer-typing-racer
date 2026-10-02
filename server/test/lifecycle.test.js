@@ -180,7 +180,7 @@ describe("Room Lifecycle & Timer Cleanup", () => {
     assert.equal(rooms.has(roomId), false);
   });
 
-  test("handleRacerLeave removes racer from waiting room, and deletes room if last racer leaves", () => {
+  test("handleRacerLeave removes racer from waiting room, and schedules emptyTimeout if last racer leaves", () => {
     const { handleRacerLeave } = require("../socket");
     const io = createMockIo();
     const roomId = createRoom();
@@ -198,9 +198,16 @@ describe("Room Lifecycle & Timer Cleanup", () => {
     assert.equal(room.racers.length, 1);
     assert.equal(room.racers[0].socketId, "socket-2");
 
-    // Socket 2 leaves (last racer)
+    // Socket 2 leaves (last racer in waiting room)
     handleRacerLeave(io, socket2, roomId);
-    assert.equal(getRoom(roomId), undefined, "Room should be deleted when all racers leave waiting room");
+    room = getRoom(roomId);
+    assert.ok(room, "Room should not be deleted immediately to prevent race conditions");
+    assert.equal(room.racers.length, 0);
+    assert.ok(room.emptyTimeout, "emptyTimeout should be scheduled when waiting room becomes empty");
+
+    // Cleanup via deleteRoom clears timer and removes room from Map
+    deleteRoom(roomId);
+    assert.equal(getRoom(roomId), undefined);
     assert.equal(rooms.has(roomId), false);
   });
 

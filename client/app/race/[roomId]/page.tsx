@@ -16,7 +16,8 @@ const MAX_RACERS = 2;
 
 export default function RacePage() {
   const params = useParams<{ roomId: string }>();
-  const roomId = params.roomId;
+  const rawRoomId = params?.roomId;
+  const roomId = Array.isArray(rawRoomId) ? rawRoomId[0] : rawRoomId;
 
   const [status, setStatus] = useState<RaceStatus>("waiting");
   const [passage, setPassage] = useState("");
@@ -43,13 +44,22 @@ export default function RacePage() {
 
   // ---- Socket wiring ----
   useEffect(() => {
+    if (!roomId) return;
+
     const socket = getSocket();
-    socket.connect();
-    setSelfId(socket.id ?? null);
 
-    socket.emit("join_room", roomId);
+    const handleConnect = () => {
+      setSelfId(socket.id ?? null);
+      socket.emit("join_room", roomId);
+      socket.emit("player_ready", roomId);
+    };
 
-    socket.emit("player_ready", roomId);
+    socket.on("connect", handleConnect);
+    if (socket.connected) {
+      handleConnect();
+    } else {
+      socket.connect();
+    }
 
     // socket.on() receives data by listening to the server.
     socket.on("room_state", (state: RaceState) => {
@@ -99,7 +109,7 @@ export default function RacePage() {
     socket.on("error_message", (message) => {
       // TODO(you): surface this in a toast/banner instead of console.
       console.error("Race error:", message);
-      alert("Race error, check console");
+      alert(`Race error: ${message}`);
     });
 
     socket.on("race_stats", (stats) => {
@@ -109,6 +119,7 @@ export default function RacePage() {
     // returns cleanup functions, to avoid memory leaks, etc.
     return () => {
       socket.emit("leave_room", roomId);
+      socket.off("connect", handleConnect);
       socket.off("room_state");
       socket.off("countdown_tick");
       socket.off("race_start");
@@ -118,7 +129,6 @@ export default function RacePage() {
       socket.off("error_message");
       socket.off("race_feedback");
       socket.off("race_stats");
-      socket.disconnect();
     };
   }, [roomId]);
 
