@@ -104,7 +104,7 @@ function initSocket(io) {
       const joined = room.racers.length;
       console.log("Racers joined ", joined);
 
-      // Start countdown once 2 racers have joined
+      // Start countdown once 2 racers have joined (2 for testing purpose)
       if (joined === 2) {
         startCountdown(io, roomId);
       }

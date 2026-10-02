@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { getSocket } from "@/lib/socket";
 import type { Racer, RaceState, RaceStatus, RaceStats } from "@/lib/types";
+import { calculateProgress } from "@/lib/validation";
 import RacerTrack from "@/components/race/RacerTrack";
 import TypingPassage from "@/components/race/TypingPassage";
 import WaitingRoom from "@/components/race/WaitingRoom";
@@ -125,29 +126,32 @@ export default function RacePage() {
   function handleTypingChange(value: string) {
     setTypedText(value);
 
+    // Optimistically update our own progress bar immediately for responsive live feedback
+    const { progressPercent } = calculateProgress(value, passage);
+    if (selfId) {
+      setRacers((prev) =>
+        prev.map((r) =>
+          r.socketId === selfId ? { ...r, progressPercent } : r
+        )
+      );
+    }
+
     const socket = getSocket();
     socket.emit("typing_progress", {
       roomId,
       typedText: value,
       timestamp: Date.now(),
     });
-
-    // TODO(you): it's fine to show an optimistic local progress % for your
-    // OWN bar for instant feedback, but the number every OTHER racer sees
-    // must come from the server's `opponent_progress` broadcast — never
-    // trust a client-reported percentage for anyone but a rough self-preview.
   }
 
   const selfWpm = useMemo(() => {
     if (!startedAt || typedText.length === 0) return 0;
     const elapsedMinutes = (Date.now() - startedAt) / 60000;
     if (elapsedMinutes <= 0) return 0;
-    const words = typedText.trim().split(/\s+/).length;
+    const { correctChars } = calculateProgress(typedText, passage);
+    const words = correctChars / 5;
     return Math.round(words / elapsedMinutes);
-    // TODO(you): this is a local, display-only estimate for responsiveness.
-    // The authoritative WPM (the one other racers see, and the one saved to
-    // leaderboards) must be computed server-side from validated keystrokes.
-  }, [typedText, startedAt]);
+  }, [typedText, startedAt, passage]);
 
   // tick timeLeft down every second while racing
   useEffect(() => {
@@ -183,14 +187,9 @@ export default function RacePage() {
 
   const accuracy = useMemo(() => {
     if (typedText.length === 0) return 100;
-    let correct = 0;
-    for (let i = 0; i < typedText.length; i++) {
-      if (typedText[i] === passage[i]) correct++;
-    }
-    return Math.round((correct / typedText.length) * 100);
-    // TODO(you): for the number that actually matters (leaderboards, results
-    // screen), use the server's calculated accuracy — this is a local,
-    // display-only estimate for the live stats bar.
+    const { correctChars, incorrectChars } = calculateProgress(typedText, passage);
+    const total = correctChars + incorrectChars;
+    return total > 0 ? Math.round((correctChars / total) * 100) : 100;
   }, [typedText, passage]);
 
   function formatTime(seconds: number | null) {

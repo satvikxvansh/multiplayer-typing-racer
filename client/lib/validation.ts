@@ -1,13 +1,28 @@
+export interface CharState {
+  char: string;
+  state: "correct" | "incorrect" | "pending";
+  isCaret: boolean;
+}
+
+export interface ProgressResult {
+  progressPercent: number;
+  isFinished: boolean;
+  correctChars: number;
+  incorrectChars: number;
+  mistypedWords: string[];
+  charStates: CharState[];
+}
+
 /**
  * Aligns a single typed word with its target word in the passage using LCS.
  * Matches common characters, identifies extra typed characters, and flags omitted characters.
  */
-function alignSingleWord(targetWord, typedWord, isPastWord) {
+function alignSingleWord(targetWord: string, typedWord: string, isPastWord: boolean) {
   if (targetWord === typedWord) {
     return {
       correctCount: targetWord.length,
       incorrectCount: 0,
-      charStates: new Array(targetWord.length).fill("correct"),
+      charStates: new Array<"correct" | "incorrect" | "pending">(targetWord.length).fill("correct"),
       hasMistake: false,
     };
   }
@@ -15,8 +30,7 @@ function alignSingleWord(targetWord, typedWord, isPastWord) {
   const tLen = typedWord.length;
   const pLen = targetWord.length;
 
-  // LCS between targetWord and typedWord
-  const dp = Array.from({ length: tLen + 1 }, () => new Int8Array(pLen + 1));
+  const dp: number[][] = Array.from({ length: tLen + 1 }, () => new Array(pLen + 1).fill(0));
   for (let i = 1; i <= tLen; i++) {
     for (let j = 1; j <= pLen; j++) {
       if (typedWord[i - 1] === targetWord[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
@@ -24,8 +38,9 @@ function alignSingleWord(targetWord, typedWord, isPastWord) {
     }
   }
 
-  const matchedTarget = new Set();
-  let i = tLen, j = pLen;
+  const matchedTarget = new Set<number>();
+  let i = tLen;
+  let j = pLen;
   while (i > 0 && j > 0) {
     if (typedWord[i - 1] === targetWord[j - 1]) {
       matchedTarget.add(j - 1);
@@ -38,7 +53,7 @@ function alignSingleWord(targetWord, typedWord, isPastWord) {
     }
   }
 
-  let correctCount = matchedTarget.size;
+  const correctCount = matchedTarget.size;
   let incorrectCount = 0;
   let hasMistake = false;
 
@@ -52,7 +67,7 @@ function alignSingleWord(targetWord, typedWord, isPastWord) {
   }
   furthestTarget = Math.min(pLen, Math.max(furthestTarget, tLen));
 
-  const charStates = [];
+  const charStates: ("correct" | "incorrect" | "pending")[] = [];
   for (let c = 0; c < pLen; c++) {
     if (matchedTarget.has(c)) {
       charStates.push("correct");
@@ -68,9 +83,16 @@ function alignSingleWord(targetWord, typedWord, isPastWord) {
   return { correctCount, incorrectCount, charStates, hasMistake };
 }
 
-function calculateProgress(typedText, passage) {
+export function calculateProgress(typedText: string, passage: string): ProgressResult {
   if (!passage) {
-    return { progressPercent: 0, isFinished: false, correctChars: 0, incorrectChars: 0, mistypedWords: [], charStates: [] };
+    return {
+      progressPercent: 0,
+      isFinished: false,
+      correctChars: 0,
+      incorrectChars: 0,
+      mistypedWords: [],
+      charStates: [],
+    };
   }
 
   const passageWords = passage.trim().split(/\s+/);
@@ -79,8 +101,8 @@ function calculateProgress(typedText, passage) {
   let correctChars = 0;
   let incorrectChars = 0;
   let progressChars = 0;
-  const mistypedWords = [];
-  const charStates = [];
+  const mistypedWords: string[] = [];
+  const charStates: CharState[] = [];
 
   let activeCaretIndex = -1;
 
@@ -117,7 +139,7 @@ function calculateProgress(typedText, passage) {
 
     // Space after word
     if (w < passageWords.length - 1) {
-      let spaceState = "pending";
+      let spaceState: "correct" | "incorrect" | "pending" = "pending";
       let isSpaceCaret = false;
 
       if (isPastWord) {
@@ -131,7 +153,7 @@ function calculateProgress(typedText, passage) {
       charStates.push({ char: " ", state: spaceState, isCaret: isSpaceCaret });
     }
 
-    // Progress characters: advance progress even when wrong chars/words are typed
+    // Progress characters
     if (isPastWord) {
       progressChars += targetWord.length + (w < passageWords.length - 1 ? 1 : 0);
     } else if (isCurrentWord) {
@@ -139,10 +161,8 @@ function calculateProgress(typedText, passage) {
     }
   }
 
-  // Determine progress percentage
   let progressPercent = Math.min(100, Math.round((progressChars / passage.length) * 100));
 
-  // Determine isFinished: reached or passed the end of the passage
   const lastTarget = passageWords[passageWords.length - 1];
   const lastTyped = typedWords[passageWords.length - 1] ?? "";
   const isFinished =
@@ -164,16 +184,10 @@ function calculateProgress(typedText, passage) {
   };
 }
 
-function calculateWpm(correctChars, startTimestamp) {
+export function calculateWpm(correctChars: number, startTimestamp: number | null): number {
+  if (!startTimestamp) return 0;
   const elapsedMinutes = (Date.now() - startTimestamp) / 60000;
   if (elapsedMinutes <= 0) return 0;
-  const words = correctChars / 5; // standard WPM convention: 5 chars = 1 word
+  const words = correctChars / 5;
   return Math.round(words / elapsedMinutes);
 }
-
-function getMistypedWords(typedText, passage) {
-  const result = calculateProgress(typedText, passage);
-  return result.mistypedWords;
-}
-
-module.exports = { calculateProgress, calculateWpm, getMistypedWords, alignSingleWord };

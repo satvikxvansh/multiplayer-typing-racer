@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useEffect } from "react";
+import { calculateProgress } from "@/lib/validation";
 
 interface TypingPassageProps {
   passage: string;
@@ -30,14 +31,9 @@ export default function TypingPassage({
   }, [disabled]);
 
   const characters = useMemo(() => {
-    return passage.split("").map((char, i) => {
-      let state: "correct" | "incorrect" | "pending" = "pending";
-      if (i < typedText.length) {
-        state = typedText[i] === char ? "correct" : "incorrect";
-      }
-      return { char, state, isCaret: i === typedText.length };
-    });
+    return calculateProgress(typedText, passage).charStates;
   }, [passage, typedText]);
+
 
   return (
     <div
