@@ -134,7 +134,7 @@ function initSocket(io) {
       racer.incorrectChars = incorrectChars;
       racer.wpm = calculateWpm(correctChars, room.startTimestamp);
 
-      io.to(roomId).emit("opponent_progress", {
+      socket.to(roomId).emit("opponent_progress", {
         socketId: socket.id,
         progressPercent,
         wpm: racer.wpm,

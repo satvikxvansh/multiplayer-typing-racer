@@ -26,7 +26,7 @@ export default function RacerTrack({ racer, isSelf }: RacerTrackProps) {
       <div className="relative h-2 flex-1 overflow-visible rounded-full border border-[#1E2329] bg-[#101316]">
         {/* filled portion of the track */}
         <div
-          className="h-full rounded-full bg-[#f2c14e89]"
+          className="h-full rounded-full bg-[#f2c14e89] transition-[width] duration-150 ease-out"
           style={{ width: `${clamped}%` }}
         />
 

@@ -83,9 +83,18 @@ export default function RacePage() {
 
     socket.on("opponent_progress", ({ socketId, progressPercent, wpm }) => {
       setRacers((prev) =>
-        prev.map((r) =>
-          r.socketId === socketId ? { ...r, progressPercent, wpm } : r
-        )
+        prev.map((r) => {
+          if (r.socketId !== socketId) return r;
+          const isOwn = r.socketId === selfId || r.socketId === socket.id;
+          if (isOwn) {
+            return {
+              ...r,
+              wpm,
+              progressPercent: Math.max(r.progressPercent, progressPercent),
+            };
+          }
+          return { ...r, progressPercent, wpm };
+        })
       );
     });
 
@@ -134,14 +143,17 @@ export default function RacePage() {
 
   // ---- Local typing handler ----
   function handleTypingChange(value: string) {
-    setTypedText(value);
+    // Prevent accidental double spaces from skipping words
+    const sanitized = value.replace(/  +/g, " ");
+    setTypedText(sanitized);
 
     // Optimistically update our own progress bar immediately for responsive live feedback
-    const { progressPercent } = calculateProgress(value, passage);
-    if (selfId) {
+    const { progressPercent } = calculateProgress(sanitized, passage);
+    const currentId = selfId || getSocket().id;
+    if (currentId) {
       setRacers((prev) =>
         prev.map((r) =>
-          r.socketId === selfId ? { ...r, progressPercent } : r
+          r.socketId === currentId ? { ...r, progressPercent } : r
         )
       );
     }
@@ -149,7 +161,7 @@ export default function RacePage() {
     const socket = getSocket();
     socket.emit("typing_progress", {
       roomId,
-      typedText: value,
+      typedText: sanitized,
       timestamp: Date.now(),
     });
   }
