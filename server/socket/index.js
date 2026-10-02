@@ -91,6 +91,17 @@ function initSocket(io) {
         return;
       }
 
+      if (room.status !== "waiting" && !room.racers.some((r) => r.socketId === socket.id)) {
+        socket.emit("error_message", "Race has already started");
+        return;
+      }
+
+      const isExistingRacer = room.racers.some((r) => r.socketId === socket.id);
+      if (room.racers.length >= (room.maxRacers || 4) && !isExistingRacer) {
+        socket.emit("error_message", "Room is full (max 4 racers)");
+        return;
+      }
+
       socket.join(roomId);
       addRacerToRoom(roomId, socket.id);
       console.log(`${socket.id} joined room ${roomId}`);
@@ -108,8 +119,8 @@ function initSocket(io) {
       const joined = room.racers.length;
       console.log("Racers joined ", joined);
 
-      // Start countdown once 2 racers have joined (2 for testing purpose)
-      if (joined === 2) {
+      // Start countdown once 4 racers have joined
+      if (joined === (room.maxRacers || 4)) {
         startCountdown(io, roomId);
       }
     });

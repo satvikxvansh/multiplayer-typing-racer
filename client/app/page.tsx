@@ -628,7 +628,7 @@ export default function TypingRacerLanding(): ReactNode {
                 <dt className="text-[11px] uppercase tracking-[0.18em] text-[#79828B]">
                   Live races
                 </dt>
-                <dd className="mt-1 font-mono text-lg text-[#E7EAED]">1v1 - 5</dd>
+                <dd className="mt-1 font-mono text-lg text-[#E7EAED]">1v1 - 4</dd>
               </div>
               <div>
                 <dt className="text-[11px] uppercase tracking-[0.18em] text-[#79828B]">

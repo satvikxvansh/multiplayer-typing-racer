@@ -12,7 +12,7 @@ import { Clock, FileText, Gauge, Target } from "lucide-react";
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
-const MAX_RACERS = 2;
+const MAX_RACERS = 4;
 
 export default function RacePage() {
   const params = useParams<{ roomId: string }>();
@@ -26,6 +26,7 @@ export default function RacePage() {
   const [typedText, setTypedText] = useState("");
   const [selfId, setSelfId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [maxRacers, setMaxRacers] = useState<number>(MAX_RACERS);
 
   const [bestWpm, setBestWpm] = useState(0);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -67,6 +68,9 @@ export default function RacePage() {
       setPassage(state.passage);
       setRacers(state.racers);
       setCountdownValue(state.countdownValue);
+      if (state.maxRacers) {
+        setMaxRacers(state.maxRacers);
+      }
     });
 
     socket.on("countdown_tick", (value) => {
@@ -235,7 +239,7 @@ export default function RacePage() {
           <WaitingRoom
             status={status}
             racers={racers}
-            maxRacers={MAX_RACERS}
+            maxRacers={maxRacers}
             countdownValue={countdownValue}
             roomId={roomId}
           />
