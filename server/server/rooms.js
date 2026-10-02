@@ -38,7 +38,8 @@ function createRoom() {
     passage: "",
     racers: [],
     countdownValue: null,
-    maxRacers: 4,
+    
+    Racers: 4,
     createdAt: Date.now(),
     countdownInterval: null,
     sampleInterval: null,

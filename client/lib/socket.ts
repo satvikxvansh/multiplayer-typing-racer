@@ -18,9 +18,14 @@ let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
  */
 export function getSocket(): Socket<ServerToClientEvents, ClientToServerEvents> {
   if (!socket) {
-    socket = io(process.env.NEXT_PUBLIC_SOCKET_URL, {
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
+    socket = io(socketUrl, {
       transports: ["websocket"],
+      upgrade: false,
       autoConnect: false,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
   }
   return socket;

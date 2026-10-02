@@ -17,9 +17,10 @@ const corsOptions = {
 app.use(cors(corsOptions));
 const io = new Server(server, { // Attach Socket.IO to that same HTTP server
   cors: {
-    origin: process.env.CORS_ORIGIN, // restrict this to your frontend URL in production
+    origin: process.env.CORS_ORIGIN || "*", // restrict this to your frontend URL in production
     methods: ["GET", "POST"],
   },
+  transports: ["websocket"],
 });
 const { createRoom } = require("./server/rooms");
 
