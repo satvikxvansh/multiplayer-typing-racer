@@ -79,90 +79,116 @@ function handleRacerLeave(io, socket, roomId) {
 
 function initSocket(io) {
   io.on("connection", (socket) => {
+
     socket.on("join_room", (roomId) => {
-      const room = getRoom(roomId);
-      if (!room) {
-        socket.emit("error_message", "Room does not exist");
-        return;
-      }
+      try {
+        if (typeof roomId !== "string") return;
+        const room = getRoom(roomId);
+        if (!room) {
+          socket.emit("error_message", "Room does not exist");
+          return;
+        }
 
-      if (room.status === "finished") {
-        socket.emit("error_message", "Race in this room has already finished");
-        return;
-      }
+        if (room.status === "finished") {
+          socket.emit("error_message", "Race in this room has already finished");
+          return;
+        }
 
-      if (room.status !== "waiting" && !room.racers.some((r) => r.socketId === socket.id)) {
-        socket.emit("error_message", "Race has already started");
-        return;
-      }
+        if (room.status !== "waiting" && !room.racers.some((r) => r.socketId === socket.id)) {
+          socket.emit("error_message", "Race has already started");
+          return;
+        }
 
-      const isExistingRacer = room.racers.some((r) => r.socketId === socket.id);
-      if (room.racers.length >= (room.maxRacers || 4) && !isExistingRacer) {
-        socket.emit("error_message", "Room is full (max 4 racers)");
-        return;
-      }
+        const isExistingRacer = room.racers.some((r) => r.socketId === socket.id);
+        if (room.racers.length >= (room.maxRacers || 4) && !isExistingRacer) {
+          socket.emit("error_message", "Room is full (max 4 racers)");
+          return;
+        }
 
-      socket.join(roomId);
-      addRacerToRoom(roomId, socket.id);
-      console.log(`${socket.id} joined room ${roomId}`);
-      io.to(roomId).emit("room_state", room);
+        socket.join(roomId);
+        addRacerToRoom(roomId, socket.id);
+        console.log(`${socket.id} joined room ${roomId}`);
+        io.to(roomId).emit("room_state", room);
+      } catch (err) {
+        console.error("join_room failed:", err);
+      }
     });
 
     socket.on("leave_room", (roomId) => {
-      handleRacerLeave(io, socket, roomId);
+      try {
+        if (typeof roomId !== "string") return;
+        handleRacerLeave(io, socket, roomId);
+      } catch (err) {
+        console.error("leave_room failed:", err);
+      }
     });
 
     socket.on("player_ready", (roomId) => {
-      const room = getRoom(roomId);
-      if (!room || room.status !== "waiting") return;
-
-      const joined = room.racers.length;
-      console.log("Racers joined ", joined);
-
-      // Start countdown once 4 racers have joined
-      if (joined === (room.maxRacers || 4)) {
-        startCountdown(io, roomId);
+      try {
+        if (typeof roomId !== "string") return;
+        const room = getRoom(roomId);
+        if (!room || room.status !== "waiting") return;
+  
+        const joined = room.racers.length;
+        console.log("Racers joined ", joined);
+  
+        // Start countdown once 4 racers have joined
+        if (joined === (room.maxRacers || 4)) {
+          startCountdown(io, roomId);
+        }
+      } catch(err) {
+        console.error("player_ready failed:", err);
       }
     });
 
-    socket.on("typing_progress", ({ roomId, typedText, timestamp }) => {
-      const room = getRoom(roomId);
-      if (!room || room.status !== "racing") return;
+    socket.on("typing_progress", (payload) => {
+      try {
+        const { roomId, typedText, timestamp } = payload ?? {};
+        if (typeof roomId !== "string" || typeof typedText !== "string") return;
 
-      const racer = room.racers.find((r) => r.socketId === socket.id);
-      if (!racer || racer.finished) return;
+        const room = getRoom(roomId);
+        if (!room || room.status !== "racing") return;
 
-      if (typedText.length < (racer.lastTypedLength ?? 0)) {
-        racer.backspaces = (racer.backspaces ?? 0) + 1;
-      }
-      racer.lastTypedLength = typedText.length;
+        // Reject oversized input (DoS protection) while allowing reasonable margin for trailing characters
+        if (typedText.length > room.passage.length + 50) return;
 
-      const { progressPercent, isFinished, correctChars, incorrectChars } =
-        calculateProgress(typedText, room.passage);
+        const racer = room.racers.find((r) => r.socketId === socket.id);
+        if (!racer || racer.finished) return;
 
-      racer.progressPercent = progressPercent;
-      racer.correctChars = correctChars;
-      racer.incorrectChars = incorrectChars;
-      racer.wpm = calculateWpm(correctChars, room.startTimestamp);
+        if (typedText.length < (racer.lastTypedLength ?? 0)) {
+          racer.backspaces = (racer.backspaces ?? 0) + 1;
+        }
+        racer.lastTypedLength = typedText.length;
 
-      socket.to(roomId).emit("opponent_progress", {
-        socketId: socket.id,
-        progressPercent,
-        wpm: racer.wpm,
-      });
+        const { progressPercent, isFinished, correctChars, incorrectChars } =
+          calculateProgress(typedText, room.passage);
 
-      if (isFinished) {
-        racer.finished = true;
-        racer.finishTimeMs = timestamp;
-        racer.mistypedWords = getMistypedWords(typedText, room.passage);
+        racer.progressPercent = progressPercent;
+        racer.correctChars = correctChars;
+        racer.incorrectChars = incorrectChars;
+        racer.wpm = calculateWpm(correctChars, room.startTimestamp);
 
-        io.to(roomId).emit("player_finished", {
+        socket.to(roomId).emit("opponent_progress", {
           socketId: socket.id,
-          finishTimeMs: timestamp,
-          placement: room.racers.filter((r) => r.finished).length,
+          progressPercent,
+          wpm: racer.wpm,
         });
 
-        checkRaceComplete(io, roomId);
+        if (isFinished) {
+          racer.finished = true;
+          racer.finishTimeMs = timestamp;
+          racer.mistypedWords = getMistypedWords(typedText, room.passage);
+
+          io.to(roomId).emit("player_finished", {
+            socketId: socket.id,
+            finishTimeMs: timestamp,
+            placement: room.racers.filter((r) => r.finished).length,
+          });
+
+          checkRaceComplete(io, roomId);
+        }
+      } catch (err) {
+        console.error("typing_progress failed:", err);
       }
     });
 
@@ -171,17 +197,24 @@ function initSocket(io) {
     });
 
     socket.on("disconnect", () => {
-      const snapshot = Array.from(rooms.values());
-      for (const room of snapshot) {
-        const hasRacer = room.racers.some((r) => r.socketId === socket.id);
-        if (hasRacer) {
-          handleRacerLeave(io, socket, room.roomId);
+      try {
+        const snapshot = Array.from(rooms.values());
+        for (const room of snapshot) {
+          const hasRacer = room.racers.some((r) => r.socketId === socket.id);
+          if (hasRacer) {
+            handleRacerLeave(io, socket, room.roomId);
+          }
         }
+        console.log(socket.id, "Disconnected");
+      } catch (err) {
+        console.error("disconnect failed:", err);
       }
-      console.log(socket.id, "Disconnected");
     });
   });
 }
+
+process.on("uncaughtException", (err) => console.error("uncaughtException:", err));
+process.on("unhandledRejection", (err) => console.error("unhandledRejection:", err));
 
 module.exports = initSocket;
 module.exports.handleRacerLeave = handleRacerLeave;
