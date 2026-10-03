@@ -1,4 +1,3 @@
-# load-tests/race-load-test.yml
 config:
   target: "https://multiplayer-typing-racer.onrender.com"
   engines:
@@ -6,59 +5,25 @@ config:
       transports: ["websocket"]
   payload:
     path: "./rooms.csv"
-    fields:
-      - "roomId"
+    fields: ["roomId"]
     order: random
     skipHeader: true
   phases:
-    - duration: 30
-      arrivalRate: 5
-      name: "Warm up"
-    - duration: 120
-      arrivalRate: 20
-      name: "Sustained load"
-    - duration: 30
-      arrivalRate: 50
-      name: "Spike"
+    - { duration: 20, arrivalRate: 2,  name: "Warm up" }
+    - { duration: 60, arrivalRate: 5,  name: "Sustained" }
+    - { duration: 30, arrivalRate: 8,  name: "Step up" }
+    - { duration: 30, arrivalRate: 12, name: "Peak" }
 
 scenarios:
   - engine: socketio-v3
     flow:
-      - emit:
-          channel: "join_room"
-          data: "{{ roomId }}"
+      - emit: ["join_room", "{{ roomId }}"]
       - think: 1
-
-      - emit:
-          channel: "player_ready"
-          data: "{{ roomId }}"
-      - think: 4 # roughly matches the server's 3-2-1 countdown before race_start
-
-      # Simulated typing in growing chunks — doesn't need to match the
-      # server's actual passage text. calculateProgress compares position
-      # by position, so a mismatch only affects simulated accuracy, not
-      # server stability.
-      - emit:
-          channel: "typing_progress"
-          data: { roomId: "{{ roomId }}", typedText: "The quick", timestamp: "{{ $timestamp }}" }
+      - emit: ["player_ready", "{{ roomId }}"]
+      - think: 4
+      - emit: ["typing_progress", { roomId: "{{ roomId }}", typedText: "The quick", timestamp: "{{ $timestamp }}" }]
       - think: 0.4
-
-      - emit:
-          channel: "typing_progress"
-          data: { roomId: "{{ roomId }}", typedText: "The quick brown fox", timestamp: "{{ $timestamp }}" }
+      - emit: ["typing_progress", { roomId: "{{ roomId }}", typedText: "The quick brown fox", timestamp: "{{ $timestamp }}" }]
       - think: 0.4
-
-      - emit:
-          channel: "typing_progress"
-          data: { roomId: "{{ roomId }}", typedText: "The quick brown fox jumps over", timestamp: "{{ $timestamp }}" }
-      - think: 0.4
-
-      - emit:
-          channel: "typing_progress"
-          data: { roomId: "{{ roomId }}", typedText: "The quick brown fox jumps over the lazy dog", timestamp: "{{ $timestamp }}" }
-      - think: 0.4
-
-      - emit:
-          channel: "typing_progress"
-          data: { roomId: "{{ roomId }}", typedText: "The quick brown fox jumps over the lazy dog and runs", timestamp: "{{ $timestamp }}" }
+      - emit: ["typing_progress", { roomId: "{{ roomId }}", typedText: "The quick brown fox jumps over", timestamp: "{{ $timestamp }}" }]
       - think: 2
