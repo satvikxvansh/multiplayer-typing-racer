@@ -2,7 +2,7 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const initSocket = require("./socket");
-const { nanoid } = require("nanoid");
+const { rooms } = require("./server/rooms");
 const cors = require('cors');
 require('dotenv').config(); 
 
@@ -33,6 +33,19 @@ app.post("/api/rooms", (req, res) => {
   res.json({ roomId });
   // TODO(you): maybe store initial room metadata in memory/DB here
   // (e.g. { roomId, maxRacers: 4, status: "waiting", createdAt: Date.now() })
+});
+
+app.get("/debug/memory", (req, res) => {
+  if (req.query.key !== process.env.DEBUG_KEY) {
+    return res.status(403).send("Forbidden");
+  }
+  const mem = process.memoryUsage();
+  res.json({
+    timestamp: Date.now(),
+    rssMB: Math.round(mem.rss / 1024 / 1024),
+    heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+    roomCount: rooms.size, // direct evidence of the leak, independent of raw memory
+  });
 });
 
 initSocket(io);
