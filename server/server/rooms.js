@@ -30,6 +30,28 @@ function clearRoomTimers(room) {
   }
 }
 
+function getPublicRoomState(room) {
+  if (!room) return null;
+  return {
+    roomId: room.roomId,
+    status: room.status,
+    passage: room.passage,
+    racers: room.racers.map((r) => ({
+      socketId: r.socketId,
+      name: r.name,
+      progressPercent: r.progressPercent,
+      wpm: r.wpm,
+      finished: r.finished,
+      finishTimeMs: r.finishTimeMs,
+      disconnected: r.disconnected,
+    })),
+    countdownValue: room.countdownValue,
+    maxRacers: room.maxRacers || 4,
+    createdAt: room.createdAt,
+    startTimestamp: room.startTimestamp,
+  };
+}
+
 function createRoom() {
   const roomId = nanoid(6);
   const room = {
@@ -38,14 +60,16 @@ function createRoom() {
     passage: "",
     racers: [],
     countdownValue: null,
-    
-    Racers: 4,
+    maxRacers: 4,
     createdAt: Date.now(),
     countdownInterval: null,
     sampleInterval: null,
     emptyTimeout: null,
     raceTimeout: null,
     cleanupTimeout: null,
+    toJSON() {
+      return getPublicRoomState(this);
+    },
   };
 
   // Schedule auto-delete if no racers ever join this room
@@ -106,6 +130,7 @@ module.exports = {
   addRacerToRoom,
   deleteRoom,
   clearRoomTimers,
+  getPublicRoomState,
   EMPTY_ROOM_TIMEOUT_MS,
   ROOM_CLEANUP_DELAY_MS,
 };

@@ -1,4 +1,4 @@
-const { rooms, getRoom, deleteRoom, addRacerToRoom, EMPTY_ROOM_TIMEOUT_MS } = require("../server/rooms");
+const { rooms, getRoom, deleteRoom, addRacerToRoom, EMPTY_ROOM_TIMEOUT_MS, getPublicRoomState } = require("../server/rooms");
 const { startCountdown, cancelCountdown, checkRaceComplete } = require("../server/raceEngine");
 const { calculateProgress, calculateWpm, getMistypedWords } = require("../server/validation");
 
@@ -25,7 +25,7 @@ function handleRacerLeave(io, socket, roomId) {
       return;
     }
 
-    io.to(roomId).emit("room_state", room);
+    io.to(roomId).emit("room_state", getPublicRoomState(room));
     return;
   }
 
@@ -42,7 +42,7 @@ function handleRacerLeave(io, socket, roomId) {
     // If racers remain in countdown, abort countdown back to waiting room
     cancelCountdown(io, roomId);
     room.racers = connectedRacers;
-    io.to(roomId).emit("room_state", room);
+    io.to(roomId).emit("room_state", getPublicRoomState(room));
     return;
   }
 
@@ -60,7 +60,7 @@ function handleRacerLeave(io, socket, roomId) {
     }
 
     // Otherwise notify remaining racers and check if the race is completed
-    io.to(roomId).emit("room_state", room);
+    io.to(roomId).emit("room_state", getPublicRoomState(room));
     checkRaceComplete(io, roomId);
     return;
   }
@@ -108,7 +108,7 @@ function initSocket(io) {
         socket.join(roomId);
         addRacerToRoom(roomId, socket.id);
         console.log(`${socket.id} joined room ${roomId}`);
-        io.to(roomId).emit("room_state", room);
+        io.to(roomId).emit("room_state", getPublicRoomState(room));
       } catch (err) {
         console.error("join_room failed:", err);
       }
